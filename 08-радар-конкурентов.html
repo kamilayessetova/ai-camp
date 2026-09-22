@@ -1,0 +1,517 @@
+<title>Радар конкурентов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ink:#F5F4F1; --surface:#FFFFFF; --surface-2:#EFEEEA; --line:#D8D6CE;
+  --text:#191B21; --text-dim:#5D6068; --text-faint:#8B8E96;
+  --accent:#9A6B10; --accent-soft:#F7EDD6;
+  --critical:#B5432C; --critical-soft:#F4DED8;
+  --good:#3C6E54; --good-soft:#DCE9E1;
+  --mine:#2C5C8A; --mine-soft:#DEE8F2;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#16181D; --surface:#1E212A; --surface-2:#262A34; --line:#333846;
+    --text:#E8EAF0; --text-dim:#9AA0AE; --text-faint:#6B7180;
+    --accent:#E3B23C; --accent-soft:#332B1B;
+    --critical:#E07A62; --critical-soft:#3A2622;
+    --good:#7FBFA0; --good-soft:#1F2E27;
+    --mine:#7FA8D4; --mine-soft:#1E2733;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#16181D; --surface:#1E212A; --surface-2:#262A34; --line:#333846;
+  --text:#E8EAF0; --text-dim:#9AA0AE; --text-faint:#6B7180;
+  --accent:#E3B23C; --accent-soft:#332B1B;
+  --critical:#E07A62; --critical-soft:#3A2622;
+  --good:#7FBFA0; --good-soft:#1F2E27;
+  --mine:#7FA8D4; --mine-soft:#1E2733;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--text);font-family:"Source Sans 3",system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:"Archivo","Source Sans 3",sans-serif;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+.wrap{max-width:1160px;margin:0 auto;padding:30px 22px 60px}
+.eyebrow{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-faint)}
+
+/* шапка */
+header{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;padding-bottom:16px;border-bottom:2px solid var(--text)}
+h1{font-size:clamp(26px,3.6vw,38px);font-weight:700;line-height:1.05;margin-top:4px}
+.meta{font-size:12.5px;color:var(--text-dim);text-align:right;line-height:1.7}
+
+/* переключатель игроков */
+.players{display:flex;gap:8px;margin:18px 0 0;flex-wrap:wrap}
+.player{flex:1 1 220px;text-align:left;padding:13px 16px;background:var(--surface);border:1px solid var(--line);cursor:pointer;display:flex;flex-direction:column;gap:3px;font:inherit;color:inherit;border-radius:3px}
+.player:hover{border-color:var(--text-dim)}
+.player[aria-pressed="true"]{border-color:var(--text);border-width:2px;padding:12px 15px}
+.player .role{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint)}
+.player[data-mine="1"][aria-pressed="true"]{background:var(--mine-soft);border-color:var(--mine)}
+.player[data-mine="1"] .role{color:var(--mine)}
+.player .nm{font-family:"Archivo",sans-serif;font-size:19px;font-weight:600}
+.player .sub{font-size:13px;color:var(--text-dim)}
+
+/* сравнение */
+.compare{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:22px}
+.cmp{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.cmp .k{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint)}
+.cmp .row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.cmp .who{font-size:12.5px;color:var(--text-dim)}
+.cmp .val{font-family:"Archivo",sans-serif;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.cmp .row.mine .val{color:var(--mine)}
+.cmp .row.lead .val{color:var(--good)}
+.cmp .row.lag .val{color:var(--critical)}
+.cmp .note{font-size:12px;color:var(--text-faint);border-top:1px solid var(--line);padding-top:6px}
+
+/* два потока */
+.streams{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:34px}
+.stream{display:flex;flex-direction:column;gap:14px;min-width:0}
+.stream > .head{display:flex;flex-direction:column;gap:3px;padding-bottom:10px;border-bottom:2px solid var(--line)}
+.stream.own > .head{border-bottom-color:var(--text-dim)}
+.stream.others > .head{border-bottom-color:var(--critical)}
+.stream h2{font-size:18px;font-weight:600}
+.stream .where{font-size:12.5px;color:var(--text-faint)}
+
+/* витрина: свой голос */
+.showcase{background:var(--surface-2);padding:14px 16px;display:flex;flex-direction:column;gap:9px;border-radius:3px}
+.showcase .line{display:flex;gap:10px;align-items:baseline;justify-content:space-between;font-size:14px}
+.showcase .line .n{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--text-dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+.themes{display:flex;flex-wrap:wrap;gap:5px}
+.themes span{font-size:12.5px;padding:3px 9px;background:var(--surface);border:1px solid var(--line);border-radius:99px;color:var(--text-dim)}
+.posts{display:flex;flex-direction:column;gap:8px}
+.post{background:var(--surface);padding:11px 14px;border-radius:3px;display:flex;flex-direction:column;gap:5px}
+.post .t{font-size:14px;line-height:1.45}
+.post .s{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--text-faint);display:flex;gap:10px;flex-wrap:wrap}
+
+/* улики: чужой голос */
+.bars{display:flex;flex-direction:column;gap:6px}
+.bar{display:grid;grid-template-columns:30px 1fr 26px;align-items:center;gap:9px}
+.bar .star{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--text-dim)}
+.bar .track{height:13px;background:var(--surface-2)}
+.bar .fill{height:100%;background:var(--text-faint)}
+.bar.low .fill{background:var(--critical)}
+.bar.high .fill{background:var(--good)}
+.bar .num{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--text-dim);text-align:right}
+.quote{background:var(--surface);border-left:3px solid var(--critical);padding:11px 14px;display:flex;flex-direction:column;gap:6px;border-radius:0 3px 3px 0}
+.quote.pos{border-left-color:var(--good)}
+.quote .q{font-size:14px;line-height:1.5}
+.quote .s{font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--text-faint);display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.chip{padding:2px 6px;background:var(--surface-2);border-radius:2px;color:var(--text-dim)}
+.chip.neg{background:var(--critical-soft);color:var(--critical)}
+.chip.pos{background:var(--good-soft);color:var(--good)}
+
+/* разрыв */
+.gap-box{margin-top:34px;background:var(--accent-soft);border:1px solid var(--accent);padding:20px 22px;display:flex;flex-direction:column;gap:9px;border-radius:3px}
+.gap-box .lab{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.gap-box .claim{font-family:"Archivo",sans-serif;font-size:clamp(17px,2.2vw,23px);font-weight:600;line-height:1.3}
+.gap-box .why{font-size:14px;color:var(--text-dim)}
+.gap-box .why b{color:var(--text);font-weight:600}
+
+/* динамика */
+.trend{margin-top:34px}
+.trend .head{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--line)}
+.trend h2{font-size:18px;font-weight:600}
+.trend .note{font-size:12.5px;color:var(--text-faint)}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.tcell{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:7px}
+.tcell .k{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint)}
+.tline{display:flex;align-items:baseline;gap:9px;font-variant-numeric:tabular-nums}
+.tline .was{font-size:15px;color:var(--text-faint)}
+.tline .arrow{color:var(--text-faint);font-size:13px}
+.tline .now{font-family:"Archivo",sans-serif;font-size:23px;font-weight:600}
+.tcell .verdict{font-size:12.5px;color:var(--text-dim);border-top:1px solid var(--line);padding-top:6px}
+.tcell.warn{background:var(--critical-soft)}
+.tcell.warn .k,.tcell.warn .verdict{color:var(--critical)}
+.tcell.warn .now{color:var(--critical)}
+
+/* динамика: графики */
+.dyn-block{margin-top:22px;background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:16px 18px 18px}
+.dyn-head{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.dyn-sub{font-size:12.5px;color:var(--text-dim);margin-top:3px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--text-dim)}
+.legend .lg{display:flex;align-items:center;gap:6px;opacity:.5}
+.legend .lg.on{opacity:1;color:var(--text);font-weight:600}
+.legend .lg i{width:9px;height:9px;border-radius:2px;flex:none}
+.legend .lg.wolt i{background:var(--mine)}
+.legend .lg.glovo i{background:var(--critical)}
+.chart-scroll{overflow-x:auto}
+.chart-scroll svg{display:block;width:100%;min-width:600px;height:auto}
+.grid{stroke:var(--line);stroke-width:1}
+.axis{fill:var(--text-faint);font-family:"JetBrains Mono",monospace;font-size:10px}
+.ser.wolt{fill:var(--mine)}
+.ser.glovo{fill:var(--critical)}
+.ser{opacity:.4}
+.ser.on{opacity:1}
+.cut{fill:var(--text-faint);font-family:"JetBrains Mono",monospace;font-size:9.5px}
+.cutline{stroke:var(--text-faint);stroke-width:1;stroke-dasharray:3 3;opacity:.6}
+.events{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.ev{display:flex;gap:10px;align-items:baseline;font-size:13.5px}
+.ev i{width:8px;height:8px;border-radius:2px;flex:none;position:relative;top:1px}
+.ev.wolt i{background:var(--mine)} .ev.glovo i{background:var(--critical)}
+.ev .m{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--text-faint);white-space:nowrap;min-width:58px}
+.dyn-note{margin-top:12px;font-size:12.5px;color:var(--text-dim);border-top:1px solid var(--line);padding-top:10px}
+.dyn-note b{color:var(--text);font-weight:600}
+.jump{margin-top:12px;padding:12px 16px;background:var(--surface-2);border-left:3px solid var(--mine);border-radius:0 3px 3px 0;font-size:13.5px;color:var(--text-dim);display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.jump button{font:inherit;font-weight:600;color:var(--mine);background:none;border:0;border-bottom:1px solid var(--mine);cursor:pointer;padding:0}
+.newlist{margin-top:16px;background:var(--surface);padding:14px 16px;border-radius:3px;display:flex;flex-direction:column;gap:8px}
+.newlist .row{display:flex;gap:10px;align-items:baseline;font-size:13.5px}
+.newlist .row .mono{color:var(--text-faint);font-size:11px;white-space:nowrap}
+.limits{margin-top:26px;background:var(--surface);padding:14px 16px;font-size:13px;color:var(--text-dim);border-radius:3px}
+.limits b{color:var(--text);font-weight:600}
+footer{margin-top:28px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--text-faint);display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:860px){.streams{grid-template-columns:1fr}.meta{text-align:left}}
+@media (prefers-reduced-motion:no-preference){.stream,.compare{animation:in .25s ease-out}@keyframes in{from{opacity:.4}to{opacity:1}}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Радар конкурентов · доставка еды, Алматы</div>
+      <h1 id="title">Wolt против Glovo</h1>
+    </div>
+    <div class="meta">
+      Собрано <span class="mono">20.09.2026</span><br>
+      <span class="mono">373 записи</span> · 7 страниц сайтов, Instagram, магазины приложений, СМИ
+    </div>
+  </header>
+
+  <div class="players" id="players"></div>
+  <div class="compare" id="compare"></div>
+
+  <section class="trend">
+    <div class="head">
+      <h2 id="trendTitle">Динамика</h2>
+      <span class="note" id="trendNote"></span>
+    </div>
+
+    <div class="dyn-block">
+      <div class="dyn-head">
+        <div>
+          <div class="eyebrow">Ряд 1 · выходы в СМИ</div>
+          <div class="dyn-sub">Записей в месяц, Google News по запросу с названием сервиса. Сентябрь 2025 — август 2026; сентябрь не показан, месяц не закончился. Считаются только записи, прошедшие критерий релевантности.</div>
+        </div>
+        <div class="legend" id="newsLegend"></div>
+      </div>
+      <div class="chart-scroll"><svg id="newsChart" viewBox="0 0 760 250" role="img" aria-labelledby="newsAlt"><title id="newsAlt">Выходы в СМИ по месяцам: Wolt 11 записей за год, Glovo 17</title></svg></div>
+      <div class="events" id="newsEvents"></div>
+    </div>
+
+    <div class="dyn-block">
+      <div class="dyn-head">
+        <div>
+          <div class="eyebrow">Ряд 2 · отзывы в магазинах приложений</div>
+          <div class="dyn-sub" id="revSub"></div>
+        </div>
+      </div>
+      <div class="tgrid" id="trendGrid"></div>
+      <div id="trendJump"></div>
+      <div class="newlist" id="trendNew"></div>
+    </div>
+
+    <div class="dyn-block">
+      <div class="dyn-head">
+        <div>
+          <div class="eyebrow">Счётчик · что опубликовано на сайте</div>
+          <div class="dyn-sub">Снимок на 20.09.2026. Ряда пока нет — и вот почему.</div>
+        </div>
+      </div>
+      <div class="tgrid" id="siteGrid"></div>
+      <div class="dyn-note" id="siteNote"></div>
+    </div>
+  </section>
+
+
+  <div class="streams">
+    <div class="stream own">
+      <div class="head">
+        <div class="eyebrow">Поток 1 · собственный голос</div>
+        <h2 id="ownTitle">Что говорит о себе</h2>
+        <div class="where" id="ownWhere">Instagram, сайт — то, что компания решила показать</div>
+      </div>
+      <div class="showcase" id="ownStats"></div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:7px">О чём пишет</div>
+        <div class="themes" id="ownThemes"></div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:7px">Что зашло аудитории</div>
+        <div class="posts" id="ownPosts"></div>
+      </div>
+    </div>
+
+    <div class="stream others">
+      <div class="head">
+        <div class="eyebrow">Поток 2 · чужой голос</div>
+        <h2 id="othTitle">Что говорят о нём</h2>
+        <div class="where" id="othWhere">Магазины приложений — то, что компания не контролирует</div>
+      </div>
+      <div class="showcase" id="othStats"></div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:7px">Распределение оценок</div>
+        <div id="othBars"></div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:7px">Дословно, с номером записи</div>
+        <div class="posts" id="othQuotes"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gap-box">
+    <div class="lab">Разрыв между потоками · это и есть материал для отстройки</div>
+    <div class="claim" id="gapClaim"></div>
+    <div class="why" id="gapWhy"></div>
+  </div>
+
+  <div class="limits" id="limits"></div>
+
+  <footer>
+    <span>Собрано через Apify · посчитано кодом · разобрано в Claude</span>
+    <span class="mono">данные в объекте PLAYERS — замените своими</span>
+  </footer>
+</div>
+
+<script>
+const NEWS = {
+  months: ["сен","окт","ноя","дек","янв","фев","мар","апр","май","июн","июл","авг"],
+  full: ["09.2025","10.2025","11.2025","12.2025","01.2026","02.2026","03.2026","04.2026","05.2026","06.2026","07.2026","08.2026"],
+  series: {
+    wolt:  {name: "Wolt",  data: [0,0,0,1,1,5,3,0,0,1,0,0], total: 11},
+    glovo: {name: "Glovo", data: [0,5,1,2,0,0,0,3,2,2,2,0], total: 17}
+  },
+  events: [
+    {i: 5,  who: "wolt",  t: "Уход Wolt из Узбекистана — 5 записей за месяц, почти половина годового объёма. «Почему Wolt ушёл из Узбекистана, а в Казахстане остался?», Ак Жайык"},
+    {i: 1,  who: "glovo", t: "Доставка Glovo встроена в приложение Kaspi.kz — 5 записей: Forbes.kz, BES.media, DigitalBusiness.kz, Bizmedia.kz"},
+    {i: 7,  who: "glovo", t: "Курьер справил нужду в детскую коляску в ЖК Алматы — 3 записи, liter.kz и Vera.kz. Повод репутационный, не продуктовый"}
+  ],
+  caveat: "Ряд показывает <b>попадание в топ-100 выдачи</b> Google News, а не число публикаций: лента сортируется по релевантности, не по дате. Ноль в месяце означает «ничего не попало в топ-100», а не «про компанию не писали». Считаются только записи, прошедшие критерий: из 60 у Wolt прошла 41, из 92 у Glovo — 65. В отсев ушла, среди прочего, запись «Италия требует официально переименовать вольт, которым измеряют электронапряжение» — Zakon.kz, по запросу «Wolt Казахстан»."
+};
+
+const SITE = {
+  wolt:  {name: "Wolt",  where: "Тарифы, подписка, главная", n: "15", unit: "цен на страницах", note: "360 ₸ за первые 1,5 км и 35 ₸ за каждые следующие 500 м, минимальный заказ 1700 ₸, подписка 1199 ₸ в месяц. Плюс 210 обещаний срока вида «20–30 мин» на витрине главной."},
+  glovo: {name: "Glovo", where: "Помощь и поддержка",       n: "0",  unit: "цен на страницах", note: "На 21 037 знаках раздела поддержки нет ни одной цифры цены. На вопрос «Сколько стоит доставка?» страница отвечает: «зависит от расстояния — чем меньше расстояние, тем ниже стоимость». Страницы /about-us/ и /partners/ отдают 404."}
+};
+
+const PLAYERS = [
+  {
+    id: "wolt", name: "Wolt", mine: true, role: "мы", sub: "витрина Казахстана 4,52 · 31 844 оценки",
+    own: {
+      where: "Instagram @wolt.kazakhstan · 8 постов за 32 дня",
+      stats: [
+        ["Постов в окне", "8"],
+        ["Медиана отклика", "9 ♥ · 1 💬"],
+        ["Лучший пост", "31 ♥"],
+        ["Постов про скидку", "7 из 8"],
+        ["Постов про сроки доставки", "0 из 8"]
+      ],
+      themes: ["Скидки и промокоды", "Подписка Wolt+", "Первый заказ −50%", "Новые партнёры: Costa Coffee, Биосфера", "Игра «найди 10 Юхо»", "Почти всё на казахском"],
+      posts: [
+        {t: "10 Юхоны таба аласың ба? 👀 — сможешь найти 10 Юхо?", s: "31 ♥ · 2 💬 · 27.08.2026 · видео"},
+        {t: "Wolt-пен алғашқы тапсырысың тиімдірек! Промокод WOLTKZ50 — минус 50% на первый заказ", s: "19 ♥ · 1 💬 · 10.09.2026 · видео"},
+        {t: "Wolt+ апталары басталды! Подписка: 0 ₸ за доставку из части ресторанов", s: "9 ♥ · 1 💬 · 17.09.2026 · видео"}
+      ]
+    },
+    others: {
+      where: "App Store, витрина Казахстана · 50 отзывов за 72 дня",
+      stats: [["Медиана оценки окна", "1"], ["Доля 1★", "88%"], ["Окно", "08.07 — 18.09.2026"], ["Ответов разработчика", "0 из 50"], ["Google Play, доля 1★", "56%"]],
+      bars: [{s:5,n:3},{s:4,n:0},{s:3,n:1},{s:2,n:2},{s:1,n:44}],
+      quotes: [
+        {q: "Если вы желаете чтобы ваш заказ в 80% случаев опаздывал, заказ доставлялся грубым, неадекватным курьером или чтобы ваш заказ просто украл курьер то это приложение для вас", rate: 1, src: "App Store", date: "17.09.2026", id: "appstore_scraper-14559525969"},
+        {q: "Сколько бы не заказывал в оснв у них какие то проблемы с заказами, и тем самым ожидаешь больше. Долго отвечают, толком помощи нет и платишь доп за сервис+ еще адрес с карты не очень", rate: 1, src: "App Store", date: "18.09.2026", id: "appstore_scraper-14563783031"},
+        {q: "Никогда не скачивайте это приложение! Курьер отдал заказ не знакомым людям и не просят никаких кодов или подтверждений. Мало того в заказе не хватало одного напитка хотя она там по стандарту идет!", rate: 1, src: "App Store", date: "13.09.2026", id: "appstore_scraper-14545079924"},
+        {q: "Супер, крутой сервис", rate: 5, src: "App Store", date: "02.09.2026", id: "appstore_scraper-14501551820"}
+      ]
+    },
+    gap: {
+      claim: "Обещаем минуты и тенге — жалуются на молчание после сбоя",
+      why: "Собственный голос: на витрине главной <b>210 обещаний срока</b> вида «20–30 мин», на страницах тарифов и подписки <b>15 конкретных цен</b>. В Instagram <b>7 постов из 8 про скидку</b> и ни одного про сроки. Чужой голос: из 75 отзывов ниже трёх звёзд <b>16 про то, что поддержка не отвечает</b>, 13 про курьера, 12 про деньги. На 50 отзывов App Store — <b>0 ответов разработчика</b>. Претензия не к меню и не к цене: и то и другое расписано. Ломается то, что происходит после сбоя заказа."
+    },
+    trend: null,
+    baseline: [
+      {k: "Записей в базе", v: "100", verdict: "50 App Store и 50 Google Play, снято 20.09.2026. Второй замер через неделю даст первую точку динамики."},
+      {k: "Медиана оценки окна", v: "1", verdict: "При витрине Казахстана 4,52. Витрина копилась годами по 31 844 голосам, окно — последние полсотни, и пишут их чаще те, у кого заказ пошёл не так."},
+      {k: "Доля 1★", v: "88%", verdict: "В App Store. В Google Play 56% — окна разной ширины, 72 дня против 5, сравнивать средние между магазинами нельзя."}
+    ],
+    trendNote: "Это <b>первый замер</b>, 20.09.2026 — базовая линия. Динамика появится со второго; выдумывать движение по одной точке нельзя. Что именно сравнивать со второго замера, описано в файле «Динамика и хранение».",
+    limits: "По <b>50 отзывов</b> на магазин, витрина Казахстана. Окна разной ширины: App Store 72 дня, Google Play 5. В выгрузке Google Play <b>48 из 50</b> отзывов на латинице, развёрнутых русскоязычных там нет — темы жалоб считались по App Store. Сами темы размечены по ключевым словам на русском и английском: казахские и украинские формулировки недосчитаны. Instagram — <b>8 постов</b>, это ниже порога выборки."
+  },
+  {
+    id: "glovo", name: "Glovo", mine: false, role: "прямой конкурент", sub: "витрина Казахстана 4,86 · 172 128 оценок",
+    own: {
+      where: "Instagram @glovo_kz · 13 постов за 46 дней",
+      stats: [
+        ["Постов в окне", "13"],
+        ["Медиана отклика", "лайки скрыты · 4 💬"],
+        ["Больше всего откликов", "30 💬"],
+        ["Постов про скидку", "9 из 13"],
+        ["Постов с обещанием срока", "0 из 13"]
+      ],
+      themes: ["Скидки −35…−50%", "Новые категории: зоотовары, Decathlon", "Партнёры: KFC, Starbucks, COCO", "Сезонные поводы: 1 сентября, лето", "География: Астана, Усть-Каменогорск"],
+      posts: [
+        {t: "Спорт пен белсенді демалысқа қажеттінің бәрі Glovo-да — заказ из Decathlon", s: "лайки скрыты · 30 💬 · 10.08.2026 · видео"},
+        {t: "Сабақтың басталуына аз қалды — цветы и сладости к 1 сентября со скидкой 15%", s: "лайки скрыты · 15 💬 · 20.08.2026 · карусель"},
+        {t: "Glovo-дағы мейрамханаларда −50%-ға дейінгі жеңілдіктер — скидки до 50% в ресторанах", s: "лайки скрыты · 13 💬 · 03.08.2026 · видео"}
+      ]
+    },
+    others: {
+      where: "App Store, витрина Казахстана · 50 отзывов за 49 дней",
+      stats: [["Медиана оценки окна", "1"], ["Доля 1★", "76%"], ["Окно", "31.07 — 18.09.2026"], ["Ответов разработчика", "0 из 50"], ["Google Play, доля 1★", "42%"]],
+      bars: [{s:5,n:8},{s:4,n:0},{s:3,n:0},{s:2,n:4},{s:1,n:38}],
+      quotes: [
+        {q: "Скачала приложение, пыталась сделать заказ, уже собираюсь оплачивать, надо ввести номер и они должны отправить код. Говорят ошибка, повторите попытку позже, несколько раз повторяла, в приложении не нашла службу поддержки. Голодная и злая. Удаляю", rate: 1, src: "App Store", date: "18.09.2026", id: "appstore_scraper-14565107198"},
+        {q: "Почти каждый раз что-то не докладывают. В последний раз 2 раза подряд не привозят и говорят в качестве компенсации 175 тенге. Как будто издеваются так. Отвратительный сервис", rate: 1, src: "App Store", date: "18.09.2026", id: "appstore_scraper-14564549150"},
+        {q: "Ни какой тех поддержки, никто ничего не контролирует. Ни заказы, ни доставку.", rate: 1, src: "App Store", date: "16.09.2026", id: "appstore_scraper-14557051447"},
+        {q: "Первый раз заказываю через Glovo, очень быстро доставили заказ 👍🏼", rate: 5, src: "App Store", date: "14.09.2026", id: "appstore_scraper-14548200173"}
+      ]
+    },
+    gap: {
+      claim: "На сайте «зависит от расстояния» — в отзывах «голодная и злая»",
+      why: "Собственный голос: в разделе поддержки <b>21 037 знаков и ни одной цифры цены</b>. На прямой вопрос «Сколько стоит доставка?» страница отвечает «зависит от расстояния». У нас на тот же вопрос — <b>360 ₸ за первые 1,5 км и 35 ₸ за каждые следующие 500 м</b>. Чужой голос: из 64 отзывов ниже трёх звёзд <b>26 про молчание поддержки</b> и 17 про деньги — списания, возвраты, компенсация «175 тенге». Обещания, которого на сайте нет, нельзя ни подтвердить, ни опровергнуть: в карту по третьему вопросу идёт «данных нет»."
+    },
+    trend: null,
+    baseline: [
+      {k: "Записей в базе", v: "100", verdict: "50 App Store и 50 Google Play на 20.09.2026. Ответов разработчика ноль — и у Glovo, и у нас."},
+      {k: "Медиана оценки окна", v: "1", verdict: "При витрине Казахстана 4,86 и 172 128 голосах. Тот же разрыв окна и витрины, что у нас: витрина — годы, окно — последние полсотни."},
+      {k: "Доля 1★", v: "76%", verdict: "В App Store против 88% у нас. В Google Play 42% против 56%. В обоих магазинах поток жалоб у нас плотнее."}
+    ],
+    trendNote: "Это <b>первый замер</b>, 20.09.2026 — базовая линия. Динамика появится со второго; выдумывать движение по одной точке нельзя.",
+    limits: "По <b>50 отзывов</b> на магазин. Сайт снялся частично: <b>/about-us/ и /partners/ отдают 404</b>, страницы «о компании» нет вовсе — значит обещания сверять не с чем, и по третьему вопросу карты пишется «данных нет», а не придуманная формулировка. Лайки в Instagram скрыты настройками профиля: актор возвращает <b>−1</b>, это не ноль. Окно постов 46 дней против 32 у нас — вовлечённость двух аккаунтов несопоставима."
+  }
+];
+
+const COMPARE = [
+  {k: "Доля 1★ · App Store", rows: [["Wolt", "88%", "lag"], ["Glovo", "76%", "lead"]], note: "витрина Казахстана, по 50 записей · чем ниже, тем лучше"},
+  {k: "Доля 1★ · Google Play", rows: [["Wolt", "56%", "lag"], ["Glovo", "42%", "lead"]], note: "окно 3–5 дней: средние по нему неустойчивы"},
+  {k: "Оценка витрины Казахстана", rows: [["Wolt", "4,52", "lag"], ["Glovo", "4,86", "lead"]], note: "31 844 против 172 128 голосов, копилось годами"},
+  {k: "Записей в СМИ за 12 мес.", rows: [["Wolt", "11", "lag"], ["Glovo", "17", "lead"]], note: "после фильтра по названию компании"},
+  {k: "Ответов разработчика", rows: [["Wolt", "0", "lag"], ["Glovo", "0", "lag"]], note: "на 100 отзывов у каждого — отраслевая норма, не отстройка"}
+];
+
+const $ = (id) => document.getElementById(id);
+let current = 0;
+
+function renderPlayers() {
+  $("players").innerHTML = PLAYERS.map((p, i) =>
+    `<button class="player" type="button" data-i="${i}" data-mine="${p.mine ? 1 : 0}" aria-pressed="${i === current}">
+       <span class="role">${p.role}</span><span class="nm">${p.name}</span><span class="sub">${p.sub}</span>
+     </button>`).join("");
+}
+
+function renderCompare() {
+  $("compare").innerHTML = COMPARE.map(c => {
+    const rows = c.rows.map(([who, val, cls]) => {
+      const mine = who === "Wolt" ? " mine" : "";
+      return `<span class="row ${cls}${mine}"><span class="who">${who}</span><span class="val">${val}</span></span>`;
+    }).join("");
+    return `<div class="cmp"><span class="k">${c.k}</span>${rows}<span class="note">${c.note}</span></div>`;
+  }).join("");
+}
+
+function renderPlayer() {
+  const p = PLAYERS[current];
+  $("title").textContent = p.mine ? `${p.name} — как нас видят` : `${p.name} — разбор конкурента`;
+  $("ownTitle").textContent = p.mine ? "Что мы говорим о себе" : "Что он говорит о себе";
+  $("othTitle").textContent = p.mine ? "Что говорят о нас" : "Что говорят о нём";
+  $("ownWhere").textContent = p.own.where;
+  $("othWhere").textContent = p.others.where;
+
+  $("ownStats").innerHTML = p.own.stats.map(([k, v]) =>
+    `<span class="line"><span>${k}</span><span class="n">${v}</span></span>`).join("");
+  $("ownThemes").innerHTML = p.own.themes.map(t => `<span>${t}</span>`).join("");
+  $("ownPosts").innerHTML = p.own.posts.map(x =>
+    `<div class="post"><span class="t">${x.t}</span><span class="s">${x.s}</span></div>`).join("");
+
+  $("othStats").innerHTML = p.others.stats.map(([k, v]) =>
+    `<span class="line"><span>${k}</span><span class="n">${v}</span></span>`).join("");
+  const max = Math.max(...p.others.bars.map(b => b.n)) || 1;
+  $("othBars").innerHTML = `<div class="bars">` + p.others.bars.map(b => {
+    const cls = b.s <= 2 ? "low" : b.s >= 4 ? "high" : "";
+    return `<div class="bar ${cls}"><span class="star">${b.s}★</span><span class="track"><span class="fill" style="width:${(b.n / max * 100).toFixed(0)}%"></span></span><span class="num">${b.n}</span></div>`;
+  }).join("") + `</div>`;
+  $("othQuotes").innerHTML = p.others.quotes.map(q =>
+    `<div class="quote ${q.rate === 5 ? "pos" : ""}"><span class="q">«${q.q}»</span><span class="s"><span class="chip ${q.rate <= 2 ? "neg" : "pos"}">${q.rate}★</span><span>${q.src}</span><span>${q.date}</span><span class="chip">${q.id}</span></span></div>`).join("");
+
+  renderNews(p.id);
+  renderSite(p.id);
+
+  const tg = $("trendGrid"), tn = $("trendNew");
+  $("trendNote").textContent = "СМИ — 12 месяцев · отзывы — один замер, 20.09.2026 · сайт — снимок";
+  $("revSub").innerHTML = "Первый замер по «" + p.name + "»: 50 отзывов App Store и 50 Google Play на 20.09.2026, витрина Казахстана";
+  const other = PLAYERS.findIndex((x, i) => i !== current && x.trend);
+  $("trendJump").innerHTML = (!p.trend && other >= 0)
+    ? `<div class="jump"><span>Замер по ${p.name} пока один — сравнивать не с чем.</span><button type="button" id="jumpBtn">Посмотреть динамику по ${PLAYERS[other].name} →</button></div>`
+    : "";
+  if (!p.trend && other >= 0) {
+    const jb = document.getElementById("jumpBtn");
+    if (jb) jb.addEventListener("click", () => { current = other; renderPlayers(); renderPlayer(); window.scrollTo({top: 0, behavior: "smooth"}); });
+  }
+  if (p.trend) {
+    tg.innerHTML = p.trend.map(t =>
+      `<div class="tcell${t.warn ? " warn" : ""}"><span class="k">${t.k}</span><span class="tline"><span class="was">${t.was}</span><span class="arrow">→</span><span class="now">${t.now}</span></span><span class="verdict">${t.verdict}</span></div>`).join("");
+    tn.innerHTML = `<div class="eyebrow">${p.trendNew.title}</div>` +
+      p.trendNew.items.map(i => `<span class="row"><span class="mono">${i.d} · ${i.s}</span><span>${i.t}</span></span>`).join("") +
+      `<span class="verdict" style="border-top:1px solid var(--line);padding-top:8px;font-size:13px;color:var(--text-dim)">${p.trendNew.verdict}</span>`;
+    tn.style.display = "";
+  } else {
+    tg.innerHTML = (p.baseline || []).map(b =>
+      `<div class="tcell"><span class="k">${b.k}</span><span class="tline"><span class="now">${b.v}</span><span class="was">замер 1 из 1</span></span><span class="verdict">${b.verdict}</span></div>`).join("");
+    tn.innerHTML = `<span class="verdict" style="font-size:13px;color:var(--text-dim)">${p.trendNote}</span>`;
+    tn.style.display = "";
+  }
+
+  $("gapClaim").textContent = p.gap.claim;
+  $("gapWhy").innerHTML = p.gap.why;
+  $("limits").innerHTML = "<b>Границы разбора.</b> " + p.limits;
+}
+
+$("players").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  current = +b.dataset.i;
+  renderPlayers();
+  renderPlayer();
+});
+
+
+function renderNews(active) {
+  const keys = Object.keys(NEWS.series);
+  const L = 40, R = 752, T = 16, B = 206, MAX = 6;
+  const gw = (R - L) / 12, bw = 13, gap = 3;
+  const span = keys.length * bw + (keys.length - 1) * gap;
+  const y = v => B - v / MAX * (B - T);
+  let s = '<title id="newsAlt">Выходы в СМИ по месяцам: Wolt 11 записей за год, Glovo 17</title>';
+  for (let v = 0; v <= MAX; v += 2) {
+    s += `<line x1="${L}" y1="${y(v)}" x2="${R}" y2="${y(v)}" class="grid"/>`;
+    s += `<text x="${L - 8}" y="${y(v) + 3.5}" class="axis" text-anchor="end">${v}</text>`;
+  }
+  NEWS.months.forEach((m, i) => {
+    const x0 = L + i * gw + (gw - span) / 2;
+    keys.forEach((k, j) => {
+      const v = NEWS.series[k].data[i];
+      if (!v) return;
+      const h = Math.max(y(0) - y(v), 2);
+      s += `<rect x="${(x0 + j * (bw + gap)).toFixed(1)}" y="${(B - h).toFixed(1)}" width="${bw}" height="${h.toFixed(1)}" rx="1" class="ser ${k}${k === active ? " on" : ""}"><title>${NEWS.series[k].name}, ${NEWS.full[i]}: ${v}</title></rect>`;
+    });
+    s += `<text x="${(L + i * gw + gw / 2).toFixed(1)}" y="${B + 18}" class="axis" text-anchor="middle">${m}</text>`;
+  });
+  s += `<text x="${L}" y="${B + 36}" class="axis">записей в месяц</text>`;
+  $("newsChart").innerHTML = s;
+  $("newsLegend").innerHTML = keys.map(k =>
+    `<span class="lg ${k}${k === active ? " on" : ""}"><i></i>${NEWS.series[k].name} · ${NEWS.series[k].total} за год</span>`).join("");
+  $("newsEvents").innerHTML = NEWS.events.map(e =>
+    `<span class="ev ${e.who}"><i></i><span class="m">${NEWS.full[e.i]}</span><span>${e.t}</span></span>`).join("") +
+    `<span class="dyn-note" style="margin-top:2px;border:0;padding-top:2px">${NEWS.caveat}</span>`;
+}
+
+function renderSite(active) {
+  $("siteGrid").innerHTML = Object.entries(SITE).map(([k, b]) =>
+    `<div class="tcell"><span class="k">${b.name} · ${b.where}</span><span class="tline"><span class="now"${k === active ? "" : ' style="color:var(--text-dim)"'}>${b.n}</span><span class="was">${b.unit}</span></span><span class="verdict">${b.note}</span></div>`).join("");
+  $("siteNote").innerHTML = "<b>Почему это счётчик, а не ряд.</b> Дат публикации на снятых страницах нет: это витрина и справка, они меняются без отметки о правке. Помесячный график по сайту строить не из чего. Работает другое: снять счётчик сегодня, снять через неделю — разница и есть темп. Цифра верна только на дату съёма: «360 ₸» — это 20.09.2026, через месяц тариф может быть другим.";
+}
+
+renderPlayers();
+renderCompare();
+renderPlayer();
+</script>
